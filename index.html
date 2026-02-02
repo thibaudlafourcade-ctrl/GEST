@@ -513,7 +513,17 @@
                 <div class="status-message" id="statusMessage"></div>
 
                 <div class="form-section" id="formSection" style="margin-top: 2rem;">
-                    <h3 style="margin-bottom: 1.5rem; color: var(--accent-cyan); font-size: 1.3rem;">📋 Informations générales</h3>
+                    <h3 style="margin-bottom: 1.5rem; color: var(--accent-cyan); font-size: 1.3rem;">🔑 Configuration API (une seule fois)</h3>
+                    
+                    <div class="form-group">
+                        <label>Clé API Anthropic <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color: var(--accent-cyan); font-size: 0.8rem;">(obtenir une clé)</a></label>
+                        <input type="password" id="apiKey" placeholder="sk-ant-...">
+                        <small style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-top: 0.3rem;">
+                            💡 Votre clé est stockée localement et n'est jamais partagée
+                        </small>
+                    </div>
+
+                    <h3 style="margin: 2rem 0 1.5rem 0; color: var(--accent-cyan); font-size: 1.3rem;">📋 Informations générales</h3>
                     
                     <div class="form-group">
                         <label>Nom du collaborateur</label>
@@ -652,6 +662,18 @@
         analyzeBtn.addEventListener('click', async () => {
             if (!currentImageData) return;
 
+            // Check if API key is provided
+            const apiKey = document.getElementById('apiKey').value || localStorage.getItem('apiKey');
+            
+            if (!apiKey) {
+                showStatus('error', '❌ Veuillez d\'abord entrer votre clé API Anthropic');
+                document.getElementById('apiKey').focus();
+                return;
+            }
+
+            // Save API key for future use
+            localStorage.setItem('apiKey', apiKey);
+
             showStatus('loading', '🔍 Analyse du ticket en cours...');
             analyzeBtn.disabled = true;
 
@@ -663,6 +685,8 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01'
                     },
                     body: JSON.stringify({
                         model: 'claude-sonnet-4-20250514',
@@ -696,6 +720,11 @@ Si une information n'est pas visible, mets une chaîne vide ou 0 pour le montant
                     })
                 });
 
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error?.message || 'Erreur API');
+                }
+
                 const data = await response.json();
                 const textContent = data.content.find(c => c.type === 'text')?.text || '';
                 
@@ -713,7 +742,11 @@ Si une information n'est pas visible, mets une chaîne vide ou 0 pour le montant
                 showStatus('success', '✅ Ticket analysé avec succès !');
             } catch (error) {
                 console.error('Error:', error);
-                showStatus('error', '❌ Erreur lors de l\'analyse. Veuillez remplir manuellement.');
+                if (error.message.includes('authentication') || error.message.includes('api_key')) {
+                    showStatus('error', '❌ Clé API invalide. Vérifiez votre clé Anthropic.');
+                } else {
+                    showStatus('error', '❌ Erreur lors de l\'analyse. Veuillez remplir manuellement.');
+                }
             } finally {
                 analyzeBtn.disabled = false;
             }
@@ -1077,7 +1110,11 @@ Si une information n'est pas visible, mets une chaîne vide ou 0 pour le montant
         const savedUserName = localStorage.getItem('userName');
         const savedCompanyName = localStorage.getItem('companyName');
         const savedPeriod = localStorage.getItem('expensePeriod');
+        const savedApiKey = localStorage.getItem('apiKey');
         
+        if (savedApiKey) {
+            document.getElementById('apiKey').value = savedApiKey;
+        }
         if (savedUserName) {
             document.getElementById('userName').value = savedUserName;
         }
